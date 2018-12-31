@@ -181,9 +181,7 @@ def compute_crosstrack_error(x, y, center, radius):
     """Compute error with reference to circular track."""
     center_x = center[0]
     center_y = center[1]
-
     error = sqrt((x - center_x)**2 + (y - center_y)**2) - radius
-
     return error
 
 def generate_error(target_bot, p, count, OTHER = None):
@@ -204,9 +202,17 @@ def generate_error(target_bot, p, count, OTHER = None):
 
         target_measurement = target_bot.sense()
 
+        if OTHER == None or OTHER[0] == 0 or OTHER[0] == 1:
+            target_x, target_y = target_measurement
+        else:
+            OTHER_aux = deepcopy(OTHER)
+            OTHER_aux[0].update(target_measurement)
+            target_x, target_y = OTHER_aux[0].get_coordinates()
+
+        OTHER = update_and_predict(target_measurement, OTHER)
+
         diff_crosstrack_error -= crosstrack_error
-        crosstrack_error = compute_crosstrack_error(target_measurement[0], target_measurement[1], \
-                                                    center, radius)
+        crosstrack_error = compute_crosstrack_error(target_x, target_y, center, radius)
         diff_crosstrack_error += crosstrack_error
         int_crosstrack_error += crosstrack_error
         target_turning = angle_trunc(k_p * crosstrack_error \
@@ -254,9 +260,9 @@ def run(hunter_bot, target_bot, filter, next_move_fcn, OTHER = None):
     ctr = 0
 
     #PID controller for circular motion
-    k_p = 0.50
-    k_d = 2.00
-    k_i = 0.01
+    k_p = 1.24
+    k_d = 0.640
+    k_i = 0.478
     center = (0, 10)
     radius = 10
     crosstrack_error = 0.0
@@ -322,6 +328,14 @@ def run(hunter_bot, target_bot, filter, next_move_fcn, OTHER = None):
         # The hunter and target broadcasts its noisy measurement
         target_measurement = target_bot.sense()
         hunter_measurement = hunter_bot.sense()
+
+        # Retrieve hunter and target estimated measurement
+        if OTHER == None or OTHER[0] == 0 or OTHER[0] == 1:
+            target_x, target_y = target_measurement
+        else:
+            OTHER_aux = deepcopy(OTHER)
+            OTHER_aux[0].update(target_measurement)
+            target_x, target_y = OTHER_aux[0].get_coordinates()
         filter.sense(hunter_measurement)
         filter_measurement= filter.get_position()
 
@@ -335,8 +349,7 @@ def run(hunter_bot, target_bot, filter, next_move_fcn, OTHER = None):
 
         # Calculate circular motion for target
         diff_crosstrack_error -= crosstrack_error
-        crosstrack_error = compute_crosstrack_error(target_measurement[0], target_measurement[1], \
-                                                    center, radius)
+        crosstrack_error = compute_crosstrack_error(target_x, target_y, center, radius)
         diff_crosstrack_error += crosstrack_error
         int_crosstrack_error += crosstrack_error
         target_turning = angle_trunc(k_p * crosstrack_error \
@@ -356,8 +369,8 @@ def run(hunter_bot, target_bot, filter, next_move_fcn, OTHER = None):
         measuredchaser_robot.goto(hunter_measurement[0]*size_multiplier, hunter_measurement[1]*size_multiplier-100)
         measuredchaser_robot.stamp()
         filterchaser_robot.setheading(hunter_bot.heading*180/pi)
-        x,y = (OTHER[0].get_coordinates() if (OTHER != None and OTHER[0] != 0 and OTHER[0] != 1) else target_measurement )
-        filterchaser_robot.goto(x*size_multiplier, y*size_multiplier-100)
+        #x,y = (OTHER[0].get_coordinates() if (OTHER != None and OTHER[0] != 0 and OTHER[0] != 1) else target_measurement )
+        filterchaser_robot.goto(target_x*size_multiplier, target_y*size_multiplier-100)
         filterchaser_robot.stamp()
         broken_robot.setheading(target_bot.heading*180/pi)
         broken_robot.goto(target_bot.x*size_multiplier, target_bot.y*size_multiplier-100)
