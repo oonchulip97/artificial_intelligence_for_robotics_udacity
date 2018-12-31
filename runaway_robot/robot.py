@@ -73,17 +73,6 @@ class robot:
 
         return weight
 
-    def compute_crosstrack_error(self, center, radius):
-        """This function compute error with reference to circular track."""
-        center_x = center[0]
-        center_y = center[1]
-
-        error = sqrt((self.x - center_x)**2 + (self.y - center_y)**2) \
-        - radius
-
-        return error
-
-
     def __repr__(self):
         """This allows us to print a robot's position"""
         return '[%.5f, %.5f]'  % (self.x, self.y)

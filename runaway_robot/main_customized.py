@@ -112,7 +112,8 @@ def next_move(hunter_position, hunter_heading, target_measurement, max_distance,
         step_cost = cost
         distance_cost = distance_between((x_hunter, y_hunter), target_loc)
         total_cost = step_cost + distance_cost
-        hunter_node.append([total_cost, step_cost, distance_cost, (x_hunter, y_hunter), angle_trunc(hunter_heading + hunter_turning)])
+        hunter_node.append([total_cost, step_cost, distance_cost, (x_hunter, y_hunter), \
+                            angle_trunc(hunter_heading + hunter_turning)])
 
     found = False
     resign = False
@@ -147,7 +148,8 @@ def next_move(hunter_position, hunter_heading, target_measurement, max_distance,
                     step_cost += cost
                     distance_cost = distance_between((x_hunter, y_hunter), target_loc_min)
                     total_cost = step_cost + distance_cost
-                    hunter_node.append([total_cost, step_cost, distance_cost, (x_hunter, y_hunter), angle_trunc(hunter_heading_min + hunter_turning)])
+                    hunter_node.append([total_cost, step_cost, distance_cost, (x_hunter, y_hunter), \
+                                        angle_trunc(hunter_heading_min + hunter_turning)])
 
     target_loc, OTHER = extrapolation(target_measurement, OTHER, expand_index)
     distance = distance_between(hunter_position,target_loc)
@@ -175,6 +177,73 @@ def get_heading(hunter_position, target_position):
     heading = angle_trunc(heading)
     return heading
 
+def compute_crosstrack_error(x, y, center, radius):
+    """Compute error with reference to circular track."""
+    center_x = center[0]
+    center_y = center[1]
+
+    error = sqrt((x - center_x)**2 + (y - center_y)**2) - radius
+
+    return error
+
+def generate_error(target_bot, p, count, OTHER = None):
+    """Generate error per step of target movement with respect to circular track."""
+
+    step = 0
+    total_error = 0
+    k_p = p[0]
+    k_d = p[1]
+    k_i = p[2]
+    center = (0, 10)
+    radius = 10
+    crosstrack_error = 0.0
+    diff_crosstrack_error = 0.0
+    int_crosstrack_error = 0.0
+
+    while step <= count:
+
+        target_measurement = target_bot.sense()
+
+        diff_crosstrack_error -= crosstrack_error
+        crosstrack_error = compute_crosstrack_error(target_measurement[0], target_measurement[1], \
+                                                    center, radius)
+        diff_crosstrack_error += crosstrack_error
+        int_crosstrack_error += crosstrack_error
+        target_turning = angle_trunc(k_p * crosstrack_error \
+                        + k_d * diff_crosstrack_error \
+                        + k_i * int_crosstrack_error)
+        target_bot.move(target_turning, target_bot.distance)
+
+        total_error += crosstrack_error
+        step += 1
+
+    return total_error / count
+
+def twiddle(target_bot, tol=0.01, OTHER = None):
+    """ Tune PID constant"""
+    p = [0.0, 0.0, 0.0]
+    dp = [1.0, 1.0, 1.0]
+    count = 200
+    target_bot_aux = deepcopy(target_bot)
+    best_error = generate_error(target_bot_aux, p, count, OTHER)
+    while sum(dp) > tol:
+        for p_index in range(len(p)):
+            p[p_index] += dp[p_index]
+            target_bot_aux = deepcopy(target_bot)
+            error = generate_error(target_bot_aux, p, count, OTHER)
+            if error < best_error:
+                best_error = error
+                dp[p_index] *= 1.1
+            else:
+                p[p_index] -= 2 * dp[p_index]
+                if error < best_error:
+                    best_err = err
+                    dp[p_index] *= 1.1
+                else:
+                    p[p_index] += dp[p_index]
+                    dp[p_index] *= 0.9
+    print p
+
 def run(hunter_bot, target_bot, filter, next_move_fcn, OTHER = None):
     """Returns True if your next_move_fcn successfully guides the hunter_bot
     to the target_bot. This function is here to help you understand how we
@@ -185,8 +254,8 @@ def run(hunter_bot, target_bot, filter, next_move_fcn, OTHER = None):
     ctr = 0
 
     #PID controller for circular motion
-    k_p = 0.5
-    k_d = 2.0
+    k_p = 0.50
+    k_d = 2.00
     k_i = 0.01
     center = (0, 10)
     radius = 10
@@ -229,12 +298,12 @@ def run(hunter_bot, target_bot, filter, next_move_fcn, OTHER = None):
     measuredchaser_robot.penup()
     measuredchaser_robot.resizemode('user')
     measuredchaser_robot.shapesize(0.1, 0.1, 0.1)
-    #filterchaser_robot = turtle.Turtle()
-    #filterchaser_robot.shape('circle')
-    #filterchaser_robot.color('white')
-    #filterchaser_robot.penup()
-    #filterchaser_robot.resizemode('user')
-    #filterchaser_robot.shapesize(0.1, 0.1, 0.1)
+    filterchaser_robot = turtle.Turtle()
+    filterchaser_robot.shape('circle')
+    filterchaser_robot.color('white')
+    filterchaser_robot.penup()
+    filterchaser_robot.resizemode('user')
+    filterchaser_robot.shapesize(0.1, 0.1, 0.1)
     broken_robot.pendown()
     chaser_robot.pendown()
     #End of Visualization
@@ -257,7 +326,8 @@ def run(hunter_bot, target_bot, filter, next_move_fcn, OTHER = None):
         filter_measurement= filter.get_position()
 
         # This is where path planning function will be called
-        hunter_turning, hunter_distance, OTHER = next_move_fcn(filter_measurement, hunter_bot.heading, target_measurement, max_distance, OTHER)
+        hunter_turning, hunter_distance, OTHER = next_move_fcn(filter_measurement, hunter_bot.heading, \
+                                                                target_measurement, max_distance, OTHER)
 
         # Don't try to move faster than allowed!
         if hunter_distance > max_distance:
@@ -265,12 +335,13 @@ def run(hunter_bot, target_bot, filter, next_move_fcn, OTHER = None):
 
         # Calculate circular motion for target
         diff_crosstrack_error -= crosstrack_error
-        crosstrack_error = target_bot.compute_crosstrack_error(center, radius)
+        crosstrack_error = compute_crosstrack_error(target_measurement[0], target_measurement[1], \
+                                                    center, radius)
         diff_crosstrack_error += crosstrack_error
         int_crosstrack_error += crosstrack_error
         target_turning = angle_trunc(k_p * crosstrack_error \
                         + k_d * diff_crosstrack_error \
-                        + k_i * int_crosstrack_error) \
+                        + k_i * int_crosstrack_error)
 
         # The hunter and target move according to your instructions
         hunter_bot.move(hunter_turning, hunter_distance)
@@ -284,9 +355,10 @@ def run(hunter_bot, target_bot, filter, next_move_fcn, OTHER = None):
         measuredchaser_robot.setheading(hunter_bot.heading*180/pi)
         measuredchaser_robot.goto(hunter_measurement[0]*size_multiplier, hunter_measurement[1]*size_multiplier-100)
         measuredchaser_robot.stamp()
-        #filterchaser_robot.setheading(hunter_bot.heading*180/pi)
-        #filterchaser_robot.goto(filter_measurement[0]*size_multiplier, filter_measurement[1]*size_multiplier-100)
-        #filterchaser_robot.stamp()
+        filterchaser_robot.setheading(hunter_bot.heading*180/pi)
+        x,y = (OTHER[0].get_coordinates() if (OTHER != None and OTHER[0] != 0 and OTHER[0] != 1) else target_measurement )
+        filterchaser_robot.goto(x*size_multiplier, y*size_multiplier-100)
+        filterchaser_robot.stamp()
         broken_robot.setheading(target_bot.heading*180/pi)
         broken_robot.goto(target_bot.x*size_multiplier, target_bot.y*size_multiplier-100)
         chaser_robot.setheading(hunter_bot.heading*180/pi)
@@ -314,4 +386,5 @@ if __name__ == "__main__":
     filter = Particles(-10.0, 0.0, 0.0,
                     hunter_turning_noise, hunter_distance_noise, hunter_measurement_noise, 100)
 
+    #twiddle(target)
     run(hunter, target, filter, next_move)
