@@ -112,7 +112,8 @@ def next_move(hunter_position, hunter_heading, target_measurement, max_distance,
         step_cost = cost
         distance_cost = distance_between((x_hunter, y_hunter), target_loc)
         total_cost = step_cost + distance_cost
-        hunter_node.append([total_cost, step_cost, distance_cost, (x_hunter, y_hunter), angle_trunc(hunter_heading + hunter_turning)])
+        hunter_node.append([total_cost, step_cost, distance_cost, (x_hunter, y_hunter), \
+                            angle_trunc(hunter_heading + hunter_turning)])
 
     found = False
     resign = False
@@ -147,7 +148,8 @@ def next_move(hunter_position, hunter_heading, target_measurement, max_distance,
                     step_cost += cost
                     distance_cost = distance_between((x_hunter, y_hunter), target_loc_min)
                     total_cost = step_cost + distance_cost
-                    hunter_node.append([total_cost, step_cost, distance_cost, (x_hunter, y_hunter), angle_trunc(hunter_heading_min + hunter_turning)])
+                    hunter_node.append([total_cost, step_cost, distance_cost, (x_hunter, y_hunter), \
+                                        angle_trunc(hunter_heading_min + hunter_turning)])
 
     target_loc, OTHER = extrapolation(target_measurement, OTHER, expand_index)
     distance = distance_between(hunter_position,target_loc)
@@ -257,7 +259,8 @@ def run(hunter_bot, target_bot, filter, next_move_fcn, OTHER = None):
         filter_measurement= filter.get_position()
 
         # This is where path planning function will be called
-        hunter_turning, hunter_distance, OTHER = next_move_fcn(filter_measurement, hunter_bot.heading, target_measurement, max_distance, OTHER)
+        hunter_turning, hunter_distance, OTHER = next_move_fcn(filter_measurement, hunter_bot.heading, \
+                                                                target_measurement, max_distance, OTHER)
 
         # Don't try to move faster than allowed!
         if hunter_distance > max_distance:
